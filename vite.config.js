@@ -7,5 +7,10 @@ export default defineConfig({
   plugins: [react() ,tailwindcss()
 
   ],
-  
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      input: resolve(__dirname, 'index.html'),
+    },
+  publicDir: 'public',
 })
