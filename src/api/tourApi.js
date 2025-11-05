@@ -222,3 +222,35 @@ export const getFilteredTours = async (filters = {}, page = 1, limit = 9) => {
   const { data } = await axiosInstance.get(`/tours/filter?${params.toString()}`);
   return data;
 };
+
+// tourApi.js
+
+// ✅ Get domestic tours only
+export const getDomesticTours = async (filters = {}) => {
+  const params = new URLSearchParams();
+  
+  Object.keys(filters).forEach(key => {
+    const value = filters[key];
+    if (value !== null && value !== undefined && value !== '') {
+      params.append(key, value.toString());
+    }
+  });
+
+  const { data } = await axiosInstance.get(`/tours/domestic?${params.toString()}`);
+  return data;
+};
+
+// ✅ Get international tours only
+export const getInternationalTours = async (filters = {}) => {
+  const params = new URLSearchParams();
+  
+  Object.keys(filters).forEach(key => {
+    const value = filters[key];
+    if (value !== null && value !== undefined && value !== '') {
+      params.append(key, value.toString());
+    }
+  });
+
+  const { data } = await axiosInstance.get(`/tours/international?${params.toString()}`);
+  return data;
+};
