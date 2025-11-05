@@ -27,7 +27,7 @@ const Layout = () => {
       <main className="flex-1 container mx-auto px-4 py-6">
         <Outlet /> {/* Nested route content will render here */}
       </main>
-      <div className="-z-40 overflow-hidden" >
+      <div className="z-0 overflow-hidden" >
       <Footer  />
       </div>
     </div>
