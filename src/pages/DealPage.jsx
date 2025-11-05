@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTours } from "../hooks/useTours";
-import TourCard from "../components/tours/TourCard";
+import TourCard from "../components/tours/tourcard/card1";
 import Pagination from "../components/common/Pagination";
 import TourFilterSidebar from "../components/tours/TourFilterSidebar";
 import { Filter, X, RefreshCw } from "lucide-react";
