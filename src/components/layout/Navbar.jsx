@@ -1,9 +1,9 @@
 // src/components/layout/Navbar.jsx
-import { FaSearch, FaUser, FaBars, FaTimes, FaChevronDown, FaTachometerAlt, FaUsers, FaCog, FaChartBar, FaHotel, FaMapMarkedAlt } from "react-icons/fa";
+import { FaSearch, FaUser, FaBars, FaTimes, FaChevronDown } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import logo from "../../assets/images/logo.png";
-import { getAllTours } from "../../api/tourApi";
+import { getDomesticTours, getInternationalTours, getAllTours } from "../../api/tourApi";
 import { getProfile } from "../../api/authApi";
 
 // Custom debounce hook
@@ -32,7 +32,10 @@ const Navbar = ({ handleLogout }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedGroupType, setSelectedGroupType] = useState("domestic");
   const [tours, setTours] = useState([]);
-  const [specialTours, setspecialTours] = useState([]);
+  const [domesticTours, setDomesticTours] = useState([]);
+  const [internationalTours, setInternationalTours] = useState([]);
+  const [specialTours, setSpecialTours] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
   const navigate = useNavigate();
 
   // Refs for click outside detection
@@ -63,7 +66,7 @@ const Navbar = ({ handleLogout }) => {
     fetchUserProfile();
   }, []);
 
-  // Fetch tours data
+  // Fetch all tours data for special tours
   useEffect(() => {
     const fetchToursData = async () => {
       try {
@@ -73,15 +76,46 @@ const Navbar = ({ handleLogout }) => {
         
         // Filter special tours
         const special = toursData.filter(tour => tour.tourType === "special");
-        setspecialTours(special);
+        setSpecialTours(special);
       } catch (err) {
         console.error("Error fetching tours:", err);
         setTours([]);
-        setspecialTours([]);
+        setSpecialTours([]);
       }
     };
     fetchToursData();
   }, []);
+
+  // Fetch domestic and international tours separately for locations
+  const fetchTourLocations = useCallback(async (category) => {
+    setLoadingLocations(true);
+    try {
+      let data;
+      if (category === 'domestic') {
+        data = await getDomesticTours({ limit: 100 });
+        const toursData = data.tours || data || [];
+        setDomesticTours(toursData);
+        return toursData;
+      } else {
+        data = await getInternationalTours({ limit: 100 });
+        const toursData = data.tours || data || [];
+        setInternationalTours(toursData);
+        return toursData;
+      }
+    } catch (err) {
+      console.error(`Error fetching ${category} tours:`, err);
+      return [];
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, []);
+
+  // Load locations when group type changes
+  useEffect(() => {
+    if (groupDropdownOpen || mobileMenuOpen) {
+      fetchTourLocations(selectedGroupType);
+    }
+  }, [selectedGroupType, groupDropdownOpen, mobileMenuOpen, fetchTourLocations]);
 
   // Check if user is admin
   const isAdmin = useMemo(() => {
@@ -99,41 +133,27 @@ const Navbar = ({ handleLogout }) => {
     }
   }, [searchQuery, navigate]);
 
-  // Get filtered locations based on selected group type - FIXED LOGIC
+  // Get filtered locations using separate API data
   const getFilteredLocations = useCallback(() => {
-    if (!tours.length) return [];
+    let sourceTours = [];
     
-    const filteredTours = tours.filter(tour => {
-      if (selectedGroupType === "international") {
-        // For international tours, check category and ensure country exists
-        return tour.category === "international" && tour.country; ;
-      } else {
-        // For domestic tours, check category and ensure state exists
-        return tour.category === "domestic" && tour.state && tour.state.trim() !== "";
-      }
-    });
+    if (selectedGroupType === "domestic") {
+      sourceTours = domesticTours;
+    } else {
+      sourceTours = internationalTours;
+    }
 
-    console.log(`Filtered ${selectedGroupType} tours:`, filteredTours); // Debug log
+    if (!sourceTours.length) {
+      return [];
+    }
 
-    const locations = filteredTours
-      .map(tour => {
-        if (selectedGroupType === "international") {
-          return tour.country;
-        } else {
-          return tour.state;
-        }
-      })
-      .filter((location, index, self) => 
-        location && 
-        location.trim() !== "" && 
-        self.indexOf(location) === index
-      )
-      .sort();
+    // Extract locations based on category
+    const locations = selectedGroupType === "domestic" 
+      ? [...new Set(sourceTours.map(tour => tour.state).filter(Boolean))]
+      : [...new Set(sourceTours.map(tour => tour.country).filter(Boolean))];
 
-    console.log(`Unique ${selectedGroupType} locations:`, locations); // Debug log
-
-    return locations;
-  }, [selectedGroupType, tours]);
+    return locations.sort();
+  }, [selectedGroupType, domesticTours, internationalTours]);
 
   // Memoized filtered locations
   const filteredLocations = useMemo(() => getFilteredLocations(), [getFilteredLocations]);
@@ -213,36 +233,36 @@ const Navbar = ({ handleLogout }) => {
 
   // Customer dashboard menu items
   const customerMenuItems = [
-    { to: "/dashboard", label: "Dashboard Overview", icon: "📊" },
-    { to: "/dashboard/bookings", label: "My Bookings", icon: "📋" },
-    { to: "/dashboard/profile", label: "Profile Settings", icon: "👤" },
-    { to: "/dashboard/wishlist", label: "Wishlist", icon: "❤️" },
-    { to: "/dashboard/payments", label: "Payment History", icon: "💳" },
-    { to: "/dashboard/reviews", label: "My Reviews", icon: "⭐" },
-    { to: "/dashboard/support", label: "Support", icon: "🛟" }
+    { to: "/dashboard", label: "Dashboard Overview" },
+    { to: "/dashboard/bookings", label: "My Bookings" },
+    { to: "/dashboard/profile", label: "Profile Settings" },
+    { to: "/dashboard/wishlist", label: "Wishlist" },
+    { to: "/dashboard/payments", label: "Payment History" },
+    { to: "/dashboard/reviews", label: "My Reviews" },
+    { to: "/dashboard/support", label: "Support" }
   ];
 
   // Admin dashboard menu items
   const adminMenuItems = [
-    { to: "/admin/dashboard", label: "Admin Dashboard", icon: <FaTachometerAlt className="text-sm" /> },
-    { to: "/admin/users", label: "User Management", icon: <FaUsers className="text-sm" /> },
-    { to: "/admin/tours", label: "Tour Management", icon: <FaMapMarkedAlt className="text-sm" /> },
-    { to: "/admin/bookings", label: "Booking Management", icon: <FaChartBar className="text-sm" /> },
-    { to: "/admin/hotels", label: "Hotel Management", icon: <FaHotel className="text-sm" /> },
-    { to: "/admin/settings", label: "System Settings", icon: <FaCog className="text-sm" /> },
-    { to: "/admin/analytics", label: "Analytics & Reports", icon: "📈" }
+    { to: "/admin/dashboard", label: "Admin Dashboard" },
+    { to: "/admin/users", label: "User Management" },
+    { to: "/admin/tours", label: "Tour Management" },
+    { to: "/admin/bookings", label: "Booking Management" },
+    { to: "/admin/hotels", label: "Hotel Management" },
+    { to: "/admin/settings", label: "System Settings" },
+    { to: "/admin/analytics", label: "Analytics & Reports" }
   ];
 
   // Navigation links
   const navLinks = [
-    { to: "/customize-tour", label: "Destinations" },
+    { to: "/customize-tour", label: "customize tours" },
     { to: "/aboutus", label: "About Us" },
     { to: "/contact", label: "Contact" },
     { to: "/deals", label: "Deals" }
   ];
 
   return (
-    <header className="bg-white shadow-md sticky top-0 z-50">
+    <header className="bg-white shadow-md sticky top-0 z-50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -264,7 +284,7 @@ const Navbar = ({ handleLogout }) => {
                   setSpecialDropdownOpen(false);
                   setDashboardDropdownOpen(false);
                 }}
-                className="flex items-center space-x-1 font-semibold text-gray-700 hover:text-orange-600 transition-colors duration-200 py-2"
+                className="flex items-center space-x-1 font-semibold text-gray-700 hover:text-indigo-600 transition-colors duration-200 py-2 whitespace-nowrap"
                 aria-expanded={groupDropdownOpen}
                 aria-haspopup="true"
                 aria-label="Group tours menu"
@@ -285,7 +305,7 @@ const Navbar = ({ handleLogout }) => {
                         onClick={() => handleGroupTypeSelect(type.key)}
                         className={`flex-1 py-2 text-sm font-medium transition-colors ${
                           selectedGroupType === type.key
-                            ? 'text-orange-600 border-b-2 border-orange-600'
+                            ? 'text-indigo-600 border-b-2 border-indigo-600'
                             : 'text-gray-500 hover:text-gray-700'
                         }`}
                       >
@@ -296,35 +316,42 @@ const Navbar = ({ handleLogout }) => {
 
                   <div className="px-4 pt-4">
                     <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-bold text-orange-600 text-sm uppercase tracking-wide">
+                      <h3 className="font-bold text-indigo-600 text-sm uppercase tracking-wide">
                         {selectedGroupType === 'domestic' ? 'Indian States' : 'Countries'}
                       </h3>
                       <button
                         onClick={() => handleCategorySelect(selectedGroupType)}
-                        className="px-3 py-1 text-xs bg-orange-50 text-orange-700 rounded-lg border border-orange-200 hover:bg-orange-100 transition-colors font-medium"
+                        className="px-3 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors font-medium"
                       >
                         View All
                       </button>
                     </div>
                     
                     <div className="max-h-64 overflow-y-auto">
-                      <div className="grid grid-cols-2 gap-2">
-                        {filteredLocations.length > 0 ? (
-                          filteredLocations.map(location => (
-                            <button
-                              key={location}
-                              onClick={() => handleLocationSelect(location)}
-                              className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-orange-50 hover:text-orange-700 rounded-md transition-colors border border-gray-100 hover:border-orange-200"
-                            >
-                              {location}
-                            </button>
-                          ))
-                        ) : (
-                          <div className="col-span-2 text-center py-4 text-gray-500 text-sm">
-                            No {selectedGroupType === 'domestic' ? 'states' : 'countries'} available
-                          </div>
-                        )}
-                      </div>
+                      {loadingLocations ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div>
+                          <p className="text-sm text-gray-500 mt-2">Loading locations...</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {filteredLocations.length > 0 ? (
+                            filteredLocations.map(location => (
+                              <button
+                                key={location}
+                                onClick={() => handleLocationSelect(location)}
+                                className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors border border-gray-100 hover:border-indigo-200"
+                              >
+                                {location}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="col-span-2 text-center py-4 text-gray-500 text-sm">
+                              No {selectedGroupType === 'domestic' ? 'states' : 'countries'} available
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -339,7 +366,7 @@ const Navbar = ({ handleLogout }) => {
                   setGroupDropdownOpen(false);
                   setDashboardDropdownOpen(false);
                 }}
-                className="flex items-center space-x-1 font-semibold text-gray-700 hover:text-orange-600 transition-colors duration-200 py-2"
+                className="flex items-center space-x-1 font-semibold text-gray-700 hover:text-indigo-600 transition-colors duration-200 py-2 whitespace-nowrap"
                 aria-expanded={specialDropdownOpen}
                 aria-haspopup="true"
                 aria-label="Speciality tours menu"
@@ -353,8 +380,8 @@ const Navbar = ({ handleLogout }) => {
               {specialDropdownOpen && (
                 <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-lg w-80 py-3 z-50 border border-gray-100">
                   <div className="px-4 py-2">
-                    <h3 className="font-bold text-orange-600 text-sm uppercase tracking-wide mb-3">
-                      special Tours
+                    <h3 className="font-bold text-indigo-600 text-sm uppercase tracking-wide mb-3">
+                      Special Tours
                     </h3>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {specialTours.length > 0 ? (
@@ -371,11 +398,11 @@ const Navbar = ({ handleLogout }) => {
                               className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 group-hover:text-orange-600 truncate">
+                              <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-600 truncate">
                                 {tour.title}
                               </p>
                               {tour.price && (
-                                <p className="text-xs text-orange-600 font-semibold">
+                                <p className="text-xs text-indigo-600 font-semibold">
                                   ${tour.price.toLocaleString()}
                                 </p>
                               )}
@@ -398,26 +425,26 @@ const Navbar = ({ handleLogout }) => {
               <Link
                 key={link.to}
                 to={link.to}
-                className="font-semibold text-gray-700 hover:text-orange-600 transition-colors duration-200 py-2"
+                className="font-semibold text-gray-700 hover:text-indigo-600 transition-colors duration-200 py-2"
                 onClick={closeAllDropdowns}
               >
                 {link.label}
               </Link>
             ))}
 
-            {/* Search Bar - Updated for tablet responsiveness */}
+            {/* Search Bar */}
             <form onSubmit={handleSearch} className="relative">
               <input
                 type="text"
                 placeholder="Search tours..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-3 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent w-32 lg:w-40 text-sm transition-all duration-200"
+                className="pl-3 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-40 text-sm transition-all duration-200"
                 aria-label="Search tours"
               />
               <button
                 type="submit"
-                className="absolute right-0 top-0 h-full px-3 bg-orange-600 text-white rounded-r-lg hover:bg-orange-700 transition-colors duration-200 flex items-center justify-center"
+                className="absolute right-0 top-0 h-full px-3 bg-indigo-600 text-white rounded-r-lg hover:bg-indigo-700 transition-colors duration-200 flex items-center justify-center"
                 aria-label="Search"
               >
                 <FaSearch className="text-sm" />
@@ -425,53 +452,11 @@ const Navbar = ({ handleLogout }) => {
             </form>
           </nav>
 
-          {/* Tablet Navigation (hidden on mobile, shown on tablet) */}
-          <nav className="hidden md:flex lg:hidden items-center space-x-4">
-            {/* Simplified navigation for tablet */}
-            <Link
-              to="/tours/category/domestic"
-              className="font-semibold text-gray-700 hover:text-orange-600 transition-colors duration-200 py-2 text-sm"
-            >
-              Domestic
-            </Link>
-            <Link
-              to="/tours/category/international"
-              className="font-semibold text-gray-700 hover:text-orange-600 transition-colors duration-200 py-2 text-sm"
-            >
-              International
-            </Link>
-            <Link
-              to="/customize-tour"
-              className="font-semibold text-gray-700 hover:text-orange-600 transition-colors duration-200 py-2 text-sm"
-            >
-              Destinations
-            </Link>
-            
-            {/* Compact Search for Tablet */}
-            <form onSubmit={handleSearch} className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-3 pr-8 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent w-28 text-sm"
-                aria-label="Search tours"
-              />
-              <button
-                type="submit"
-                className="absolute right-0 top-0 h-full px-2 bg-orange-600 text-white rounded-r-lg hover:bg-orange-700 transition-colors duration-200 flex items-center justify-center"
-                aria-label="Search"
-              >
-                <FaSearch className="text-xs" />
-              </button>
-            </form>
-          </nav>
-
           {/* User Actions */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-4">
             {userInfo ? (
               <div className="flex items-center space-x-4">
-                {/* Dashboard Dropdown - Different for Admin vs Customer */}
+                {/* Dashboard Dropdown */}
                 <div className="relative" ref={dashboardDropdownRef}>
                   <button
                     onClick={() => {
@@ -479,17 +464,17 @@ const Navbar = ({ handleLogout }) => {
                       setGroupDropdownOpen(false);
                       setSpecialDropdownOpen(false);
                     }}
-                    className={`flex items-center space-x-2 px-3 lg:px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors duration-200 font-medium text-sm lg:text-base ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-medium text-sm ${
                       isAdmin 
                         ? 'bg-purple-600 text-white hover:bg-purple-700' 
-                        : 'bg-orange-600 text-white hover:bg-orange-700'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
                     }`}
                     aria-expanded={dashboardDropdownOpen}
                     aria-haspopup="true"
                     aria-label="Dashboard menu"
                   >
-                    <FaTachometerAlt className="text-sm" />
-                    <span className="hidden lg:inline">{isAdmin ? 'Admin Panel' : 'Dashboard'}</span>
+                    <FaUser className="text-sm" />
+                    <span>{isAdmin ? 'Admin Panel' : 'Dashboard'}</span>
                     <FaChevronDown className={`text-xs transition-transform duration-200 ${
                       dashboardDropdownOpen ? 'rotate-180' : ''
                     }`} />
@@ -502,9 +487,9 @@ const Navbar = ({ handleLogout }) => {
                         <div className="px-3 py-2 border-b border-gray-100">
                           <div className="flex items-center space-x-2">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              isAdmin ? 'bg-purple-100' : 'bg-orange-100'
+                              isAdmin ? 'bg-purple-100' : 'bg-indigo-100'
                             }`}>
-                              <FaUser className={isAdmin ? 'text-purple-600 text-sm' : 'text-orange-600 text-sm'} />
+                              <FaUser className={isAdmin ? 'text-purple-600 text-sm' : 'text-indigo-600 text-sm'} />
                             </div>
                             <div>
                               <p className="font-semibold text-gray-900 text-sm">{userInfo.name}</p>
@@ -521,14 +506,9 @@ const Navbar = ({ handleLogout }) => {
                             <Link
                               key={item.to}
                               to={item.to}
-                              className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 rounded-md transition-colors"
+                              className="flex items-center space-x-3 px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors"
                               onClick={() => setDashboardDropdownOpen(false)}
                             >
-                              {typeof item.icon === 'string' ? (
-                                <span className="text-base">{item.icon}</span>
-                              ) : (
-                                item.icon
-                              )}
                               <span className="text-sm">{item.label}</span>
                             </Link>
                           ))}
@@ -540,7 +520,6 @@ const Navbar = ({ handleLogout }) => {
                             onClick={handleLogout}
                             className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
                           >
-                            <span>🚪</span>
                             <span>Logout</span>
                           </button>
                         </div>
@@ -553,14 +532,14 @@ const Navbar = ({ handleLogout }) => {
               <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
-                  className="font-semibold text-gray-700 hover:text-orange-600 transition-colors duration-200 text-sm lg:text-base"
+                  className="font-semibold text-gray-700 hover:text-indigo-600 transition-colors duration-200 text-sm"
                   onClick={closeAllDropdowns}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-orange-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors duration-200 font-medium text-sm lg:text-base"
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-medium text-sm"
                   onClick={closeAllDropdowns}
                 >
                   Register
@@ -569,8 +548,8 @@ const Navbar = ({ handleLogout }) => {
             )}
           </div>
 
-          {/* Mobile Menu Button - Show on mobile and tablet */}
-          <div className="md:hidden flex items-center">
+          {/* Mobile Menu Button */}
+          <div className="lg:hidden flex items-center">
             <button
               ref={mobileMenuButtonRef}
               onClick={toggleMobileMenu}
@@ -583,18 +562,18 @@ const Navbar = ({ handleLogout }) => {
           </div>
         </div>
 
-        {/* Mobile Menu - Enhanced for tablet */}
+        {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div 
             ref={mobileMenuRef}
             id="mobile-menu"
-            className="md:hidden bg-white border-t border-gray-200 py-4 px-4 space-y-4 max-h-screen overflow-y-auto"
+            className="lg:hidden bg-white border-t border-gray-200 py-4 px-4 space-y-4 max-h-screen overflow-y-auto"
           >
             {/* Group Tours Mobile */}
             <div>
               <button
                 onClick={() => setGroupDropdownOpen(!groupDropdownOpen)}
-                className="w-full flex items-center justify-between py-3 px-3 font-semibold text-gray-700 hover:bg-gray-50 rounded-lg transition-colors text-base"
+                className="w-full flex items-center justify-between py-3 px-3 font-semibold text-gray-700 hover:bg-gray-50 rounded-lg transition-colors text-base whitespace-nowrap"
                 aria-expanded={groupDropdownOpen}
               >
                 <span>Group Tours</span>
@@ -612,7 +591,7 @@ const Navbar = ({ handleLogout }) => {
                         onClick={() => handleGroupTypeSelect(type.key)}
                         className={`flex-1 py-2 text-sm font-medium transition-colors ${
                           selectedGroupType === type.key
-                            ? 'text-orange-600 border-b-2 border-orange-600'
+                            ? 'text-indigo-600 border-b-2 border-indigo-600'
                             : 'text-gray-500 hover:text-gray-700'
                         }`}
                       >
@@ -626,13 +605,18 @@ const Navbar = ({ handleLogout }) => {
                       handleCategorySelect(selectedGroupType);
                       setMobileMenuOpen(false);
                     }}
-                    className="w-full text-left px-3 py-3 rounded-lg text-base font-medium bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 mb-2"
+                    className="w-full text-left px-3 py-3 rounded-lg text-base font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 mb-2"
                   >
                     All {selectedGroupType === 'domestic' ? 'Domestic Tours' : 'International Tours'}
                   </button>
                   
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {filteredLocations.length > 0 ? (
+                    {loadingLocations ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div>
+                        <p className="text-sm text-gray-500 mt-2">Loading locations...</p>
+                      </div>
+                    ) : filteredLocations.length > 0 ? (
                       filteredLocations.map(location => (
                         <button
                           key={location}
@@ -640,7 +624,7 @@ const Navbar = ({ handleLogout }) => {
                             handleLocationSelect(location);
                             setMobileMenuOpen(false);
                           }}
-                          className="block w-full text-left px-3 py-3 text-base text-gray-600 hover:bg-orange-50 rounded-md border border-gray-100"
+                          className="block w-full text-left px-3 py-3 text-base text-gray-600 hover:bg-indigo-50 rounded-md border border-gray-100"
                         >
                           {location}
                         </button>
@@ -659,7 +643,7 @@ const Navbar = ({ handleLogout }) => {
             <div>
               <button
                 onClick={() => setSpecialDropdownOpen(!specialDropdownOpen)}
-                className="w-full flex items-center justify-between py-3 px-3 font-semibold text-gray-700 hover:bg-gray-50 rounded-lg transition-colors text-base"
+                className="w-full flex items-center justify-between py-3 px-3 font-semibold text-gray-700 hover:bg-gray-50 rounded-lg transition-colors text-base whitespace-nowrap"
                 aria-expanded={specialDropdownOpen}
               >
                 <span>Speciality Tours</span>
@@ -691,7 +675,7 @@ const Navbar = ({ handleLogout }) => {
                             {tour.title}
                           </p>
                           {tour.price && (
-                            <p className="text-sm text-orange-600 font-semibold">
+                            <p className="text-sm text-indigo-600 font-semibold">
                               ${tour.price.toLocaleString()}
                             </p>
                           )}
@@ -706,53 +690,6 @@ const Navbar = ({ handleLogout }) => {
                 </div>
               )}
             </div>
-
-            {/* Dashboard Mobile - Different for Admin vs Customer */}
-            {userInfo && (
-              <div>
-                <button
-                  onClick={() => setDashboardDropdownOpen(!dashboardDropdownOpen)}
-                  className="w-full flex items-center justify-between py-3 px-3 font-semibold text-gray-700 hover:bg-gray-50 rounded-lg transition-colors text-base"
-                  aria-expanded={dashboardDropdownOpen}
-                >
-                  <span>{isAdmin ? 'Admin Panel' : 'Dashboard'}</span>
-                  <FaChevronDown className={`text-xs transition-transform duration-200 ${
-                    dashboardDropdownOpen ? 'rotate-180' : ''
-                  }`} />
-                </button>
-                
-                {dashboardDropdownOpen && (
-                  <div className="ml-4 mt-2 space-y-2">
-                    {/* User Info in Mobile */}
-                    <div className="px-3 py-3 bg-gray-50 rounded-lg mb-2">
-                      <p className="font-medium text-gray-900 text-base">{userInfo.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {isAdmin ? 'Administrator' : 'Customer'}
-                      </p>
-                    </div>
-
-                    {(isAdmin ? adminMenuItems : customerMenuItems).map((item) => (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        className="flex items-center space-x-3 py-3 px-3 text-base text-gray-600 hover:bg-orange-50 rounded-md transition-colors"
-                        onClick={() => {
-                          setDashboardDropdownOpen(false);
-                          setMobileMenuOpen(false);
-                        }}
-                      >
-                        {typeof item.icon === 'string' ? (
-                          <span className="text-lg">{item.icon}</span>
-                        ) : (
-                          item.icon
-                        )}
-                        <span>{item.label}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Mobile Navigation Links */}
             {navLinks.map(link => (
@@ -774,12 +711,12 @@ const Navbar = ({ handleLogout }) => {
                   placeholder="Search tours..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-4 pr-12 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-base"
+                  className="w-full pl-4 pr-12 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base"
                   aria-label="Search tours"
                 />
                 <button
                   type="submit"
-                  className="absolute right-0 top-0 h-full px-4 bg-orange-600 text-white rounded-r-lg hover:bg-orange-700 transition-colors"
+                  className="absolute right-0 top-0 h-full px-4 bg-indigo-600 text-white rounded-r-lg hover:bg-indigo-700 transition-colors"
                   aria-label="Search"
                 >
                   <FaSearch className="text-base" />
@@ -793,9 +730,9 @@ const Navbar = ({ handleLogout }) => {
                 <div className="space-y-3">
                   <div className="flex items-center space-x-3 px-3 py-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      isAdmin ? 'bg-purple-100' : 'bg-orange-100'
+                      isAdmin ? 'bg-purple-100' : 'bg-indigo-100'
                     }`}>
-                      <FaUser className={isAdmin ? 'text-purple-600' : 'text-orange-600'} />
+                      <FaUser className={isAdmin ? 'text-purple-600' : 'text-indigo-600'} />
                     </div>
                     <div>
                       <p className="font-medium text-gray-700 text-base">{userInfo.name}</p>
@@ -825,7 +762,7 @@ const Navbar = ({ handleLogout }) => {
                   </Link>
                   <Link
                     to="/register"
-                    className="text-center py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium text-base"
+                    className="text-center py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-base"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Register
