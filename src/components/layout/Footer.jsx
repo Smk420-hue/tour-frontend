@@ -31,7 +31,7 @@ const Footer = () => {
     { name: "Home", path: "/" },
     { name: "Tours", path: "/tours" },
     { name: "customize tour", path: "/customize-tour" },
-    { name: "About Us", path: "/about" },
+    { name: "About Us", path: "/aboutus" },
     { name: "Contact", path: "/contact" },
   ];
 
@@ -204,3 +204,4 @@ const Footer = () => {
 };
 
 export default Footer;
+
