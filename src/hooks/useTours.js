@@ -396,6 +396,66 @@ const fetchToursByDiscount = useCallback(async (page = 1, limit = 9) => {
     }
   }, []);
 
+  // ✅ Get domestic tours only
+ // useTours.js
+
+// ✅ Fetch domestic tours
+const fetchDomesticTours = useCallback(async (filters = {}) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const data = await tourApi.getDomesticTours(filters);
+    const toursData = extractData(data);
+    setTours(Array.isArray(toursData) ? toursData : []);
+    return data;
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || "Failed to load domestic tours";
+    setError(errorMessage);
+    throw new Error(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+// ✅ Fetch international tours
+const fetchInternationalTours = useCallback(async (filters = {}) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const data = await tourApi.getInternationalTours(filters);
+    const toursData = extractData(data);
+    setTours(Array.isArray(toursData) ? toursData : []);
+    return data;
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || "Failed to load international tours";
+    setError(errorMessage);
+    throw new Error(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+// ✅ Get locations for filtering (much simpler now!)
+const getTourLocations = useCallback(async (category) => {
+  try {
+    let data;
+    if (category === 'domestic') {
+      data = await tourApi.getDomesticTours({ limit: 100 });
+    } else {
+      data = await tourApi.getInternationalTours({ limit: 100 });
+    }
+    
+    const tours = extractData(data);
+    const locations = category === 'domestic' 
+      ? [...new Set(tours.map(tour => tour.state).filter(Boolean))]
+      : [...new Set(tours.map(tour => tour.country).filter(Boolean))];
+    
+    return locations.sort();
+  } catch (err) {
+    console.error('Error fetching locations:', err);
+    return [];
+  }
+}, []);
 
   // ✅ Utility functions
   const clearError = useCallback(() => setError(null), []);
@@ -457,5 +517,8 @@ const fetchToursByDiscount = useCallback(async (page = 1, limit = 9) => {
     fetchToursByDiscount,
     sendTourPdfEmail,
     downloadTourPdf,
+    fetchDomesticTours,
+    fetchInternationalTours,
+    getTourLocations
   };
 };
