@@ -30,56 +30,111 @@ export const useTours = () => {
   const params = useParams();
   const location = useLocation();
 
+  // const fetchTours = useCallback(async (filters = {}) => {
+  //   setLoading(true);
+  //   setError(null);
+  //   try {
+  //     // Merge URL parameters with passed filters
+  //     const mergedFilters = { ...filters };
+      
+  //     // Add URL parameters to filters
+  //     if (params.state) {
+  //       mergedFilters.state = params.state;
+  //     }
+  //     if (params.country) {
+  //       mergedFilters.country = params.country;
+  //     }
+  //     if (params.category) {
+  //       mergedFilters.category = params.category;
+  //     }
+  //     if (params.location) {
+  //       mergedFilters.location = params.location;
+  //     }
+
+  //     // Handle search query from URL
+  //     const urlParams = new URLSearchParams(location.search);
+  //     const searchQuery = urlParams.get('q');
+  //     if (searchQuery && !mergedFilters.search) {
+  //       mergedFilters.search = searchQuery;
+  //     }
+
+  //     console.log('Fetching tours with filters:', mergedFilters); // Debug log
+
+  //     const data = await tourApi.getAllTours(mergedFilters);
+  //     const toursData = extractData(data);
+      
+  //     setTours(Array.isArray(toursData) ? toursData : []);
+      
+  //     // Set pagination if available
+  //     if (data.pagination) {
+  //       setTotalPages(data.pagination.totalPages || 1);
+  //     }
+      
+  //     return data;
+  //   } catch (err) {
+  //     const errorMessage = err.response?.data?.message || "Failed to load tours";
+  //     setError(errorMessage);
+  //     console.error('Error fetching tours:', err);
+  //     throw new Error(errorMessage);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, [params, location]); // Add dependencies
+
+
   const fetchTours = useCallback(async (filters = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Merge URL parameters with passed filters
-      const mergedFilters = { ...filters };
-      
-      // Add URL parameters to filters
-      if (params.state) {
-        mergedFilters.state = params.state;
-      }
-      if (params.country) {
-        mergedFilters.country = params.country;
-      }
-      if (params.category) {
-        mergedFilters.category = params.category;
-      }
-      if (params.location) {
-        mergedFilters.location = params.location;
-      }
-
-      // Handle search query from URL
-      const urlParams = new URLSearchParams(location.search);
-      const searchQuery = urlParams.get('q');
-      if (searchQuery && !mergedFilters.search) {
-        mergedFilters.search = searchQuery;
-      }
-
-      console.log('Fetching tours with filters:', mergedFilters); // Debug log
-
-      const data = await tourApi.getAllTours(mergedFilters);
-      const toursData = extractData(data);
-      
-      setTours(Array.isArray(toursData) ? toursData : []);
-      
-      // Set pagination if available
-      if (data.pagination) {
-        setTotalPages(data.pagination.totalPages || 1);
-      }
-      
-      return data;
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || "Failed to load tours";
-      setError(errorMessage);
-      console.error('Error fetching tours:', err);
-      throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  setError(null);
+  try {
+    // Merge URL parameters with passed filters
+    const mergedFilters = { ...filters };
+    
+    // Add URL parameters to filters
+    if (params.state) {
+      mergedFilters.state = params.state;
     }
-  }, [params, location]); // Add dependencies
+    if (params.country) {
+      mergedFilters.country = params.country;
+    }
+    if (params.category) {
+      mergedFilters.category = params.category;
+    }
+    if (params.location) {
+      mergedFilters.location = params.location;
+    }
+
+    // Handle search query from URL
+    const urlParams = new URLSearchParams(location.search);
+    const searchQuery = urlParams.get('q');
+    if (searchQuery && !mergedFilters.search) {
+      mergedFilters.search = searchQuery;
+    }
+
+    console.log('🎯 Fetching tours with ENHANCED filters:', mergedFilters); // Debug log
+
+    // ✅ CHANGE THIS LINE: Use the new enhanced filter API
+    const data = await tourApi.getFilteredToursEnhanced(mergedFilters);
+    const toursData = data.tours || [];
+    
+    setTours(Array.isArray(toursData) ? toursData : []);
+    
+    // Set pagination if available
+    if (data.pagination) {
+      setTotalPages(data.pagination.totalPages || 1);
+    } else if (data.totalPages) {
+      setTotalPages(data.totalPages);
+    }
+    
+    return data;
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || "Failed to load tours";
+    setError(errorMessage);
+    console.error('❌ Error fetching tours:', err);
+    throw new Error(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+}, [params, location]);
 
 
 
@@ -457,6 +512,29 @@ const getTourLocations = useCallback(async (category) => {
   }
 }, []);
 
+// In useTours.js - replace the existing fetchTours or add new method
+const fetchFilteredTours = useCallback(async (filters = {}) => {
+  setLoading(true);
+  setError(null);
+  try {
+    console.log('🎯 Fetching with enhanced filters:', filters);
+    
+    const data = await tourApi.getFilteredToursEnhanced(filters);
+    const toursData = data.tours || [];
+    
+    setTours(Array.isArray(toursData) ? toursData : []);
+    setTotalPages(data.totalPages || 1);
+    
+    return data;
+  } catch (err) {
+    const errorMessage = err.response?.data?.message || "Failed to load tours";
+    setError(errorMessage);
+    console.error('❌ Filter error:', err);
+    throw new Error(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+}, []);
   // ✅ Utility functions
   const clearError = useCallback(() => setError(null), []);
   const clearSelectedTour = useCallback(() => setSelectedTour(null), []);
@@ -519,6 +597,7 @@ const getTourLocations = useCallback(async (category) => {
     downloadTourPdf,
     fetchDomesticTours,
     fetchInternationalTours,
-    getTourLocations
+    getTourLocations,
+    fetchFilteredTours
   };
 };
