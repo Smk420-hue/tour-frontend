@@ -15,13 +15,20 @@ const TourListing = () => {
   const { fetchTours } = useTours();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ✅ Filters from URL
+  // ✅ Add state for mobile sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // ✅ Complete filters from URL (including price range)
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
     category: searchParams.get("category") || "",
     state: searchParams.get("state") || "",
     country: searchParams.get("country") || "",
     sortBy: searchParams.get("sortBy") || "latest",
+    minPrice: Number(searchParams.get("minPrice")) || 0,
+    maxPrice: Number(searchParams.get("maxPrice")) || 500000,
+    duration: searchParams.get("duration") || "",
+    rating: searchParams.get("rating") || "",
   });
 
   const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
@@ -36,13 +43,30 @@ const TourListing = () => {
 
   const stableFetchTours = useCallback(fetchTours, [fetchTours]);
 
+  // Add this to TourListing.jsx - right after the state declarations
+useEffect(() => {
+  console.log('🔍 CURRENT FILTERS STATE:', filters);
+  console.log('📊 Current page:', page);
+  console.log('🔄 Loading state:', loading);
+}, [filters, page, loading]);
+
+// Add this to debug the API call
+useEffect(() => {
+  console.log('🎯 TOURS DATA:', {
+    toursCount: tours.length,
+    displayToursCount: displayTours.length,
+    totalPages: totalPages,
+    loading: loading
+  });
+}, [tours, displayTours, totalPages, loading]);
+
   // ✅ Debounced search with optimized delay
   const handleSearch = useMemo(
     () =>
       debounce((value) => {
         setFilters((prev) => ({ ...prev, search: value }));
         setPage(1);
-      }, 300), // Reduced from 500ms for better responsiveness
+      }, 300),
     []
   );
 
@@ -66,9 +90,35 @@ const TourListing = () => {
           setIsTransitioning(true);
         }
 
+        // Prepare API filters with proper structure
+        const apiFilters = {
+          // Search & Basic
+          search: filters.search || '',
+          category: filters.category || '',
+          state: filters.state || '',
+          country: filters.country || '',
+          
+          // Price Range
+          minPrice: filters.minPrice || 0,
+          maxPrice: filters.maxPrice || 500000,
+          
+          // Duration
+          duration: filters.duration || '',
+          
+          // Rating
+          rating: filters.rating || '',
+          
+          // Sorting
+          sortBy: filters.sortBy || 'latest',
+          
+          // Pagination
+          page: page,
+        };
+
+        console.log('🚀 Fetching tours with filters:', apiFilters);
+
         const data = await stableFetchTours({
-          ...filters,
-          page,
+          ...apiFilters,
           signal: abortController.signal,
         });
 
@@ -81,7 +131,7 @@ const TourListing = () => {
         if (!isMounted) return;
 
         setTours(data?.tours || []);
-        setDisplayTours(data?.tours || []); // Update display tours after delay
+        setDisplayTours(data?.tours || []);
         setTotalPages(data?.totalPages || 1);
         
       } catch (err) {
@@ -115,21 +165,41 @@ const TourListing = () => {
   // ✅ Sync URL with filters + page (no loop)
   useEffect(() => {
     const params = new URLSearchParams();
+    
+    // Add all filter values
     Object.entries(filters).forEach(([key, val]) => {
-      if (val) params.set(key, val);
+      if (val && val !== '' && val !== 0) {
+        // Skip default values
+        if (key === 'minPrice' && val === 0) return;
+        if (key === 'maxPrice' && val === 500000) return;
+        if (key === 'sortBy' && val === 'latest') return;
+        
+        params.set(key, val.toString());
+      }
     });
+
     if (page > 1) params.set("page", page.toString());
 
     const newParams = params.toString();
     const currentParams = searchParams.toString();
 
-    if (newParams !== currentParams) setSearchParams(params);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, page]);
+    if (newParams !== currentParams) {
+      setSearchParams(params);
+    }
+  }, [filters, page, searchParams, setSearchParams]);
 
-  // ✅ Handlers
+  // ✅ Fixed: Handle filter changes from sidebar
   const handleFilterChange = useCallback((updatedFilters) => {
-    setFilters((prev) => ({ ...prev, ...updatedFilters }));
+    console.log('🔄 TourListing: Filter changed', updatedFilters);
+    
+    // Update local state with new filters
+    setFilters(prev => {
+      const newFilters = { ...prev, ...updatedFilters };
+      console.log('🔄 Setting new filters:', newFilters);
+      return newFilters;
+    });
+    
+    // Reset to page 1 when filters change
     setPage(1);
   }, []);
 
@@ -137,7 +207,6 @@ const TourListing = () => {
     (newPage) => {
       if (newPage !== page) {
         setPage(newPage);
-        // Keep current tours visible during transition to reduce flicker
         setIsTransitioning(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
@@ -146,23 +215,40 @@ const TourListing = () => {
   );
 
   const handleClearFilters = useCallback(() => {
-    setFilters({
+    console.log('🗑️ Clearing all filters');
+    const resetFilters = {
       search: "",
       category: "",
       state: "",
       country: "",
       sortBy: "latest",
-    });
+      minPrice: 0,
+      maxPrice: 500000,
+      duration: "",
+      rating: "",
+    };
+    setFilters(resetFilters);
     setPage(1);
   }, []);
 
   const handleRetry = useCallback(() => {
-    setFilters({ ...filters }); // Trigger refetch
-  }, [filters]);
+    console.log('🔄 Retrying fetch');
+    // Create new object to trigger re-fetch
+    setFilters(prev => ({ ...prev }));
+  }, []);
+
+  // ✅ Sidebar handlers
+  const handleSidebarClose = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+
+  const handleSidebarToggle = useCallback(() => {
+    setIsSidebarOpen(prev => !prev);
+  }, []);
 
   const memoizedFilters = useMemo(() => filters, [filters]);
 
-  // ✅ Animation variants for smooth transitions
+  // ✅ Animation variants
   const pageVariants = {
     initial: { 
       opacity: 0, 
@@ -214,27 +300,42 @@ const TourListing = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
-      {/* Sidebar */}
+      {/* Sidebar - Fixed: Add required props */}
       <TourFilterSidebar
+        isOpen={isSidebarOpen}
+        onClose={handleSidebarClose}
         onFilterChange={handleFilterChange}
-        onClearFilters={handleClearFilters}
         initialFilters={memoizedFilters}
       />
 
       {/* Main Section */}
       <main className="flex-1 p-4 md:p-6" aria-busy={loading}>
-        {/* Header - No animation needed here */}
+        {/* Header with Mobile Filter Button */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-              Explore Tours
-            </h1>
-            {!loading && displayTours.length > 0 && (
-              <p className="text-gray-600 mt-1">
-                Showing {displayTours.length} tour{displayTours.length !== 1 ? "s" : ""}
-              </p>
-            )}
+          <div className="flex items-center gap-4">
+            {/* Mobile Filter Toggle Button */}
+            <button
+              onClick={handleSidebarToggle}
+              className="lg:hidden flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
+              </svg>
+              Filters
+            </button>
+            
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                Explore Tours
+              </h1>
+              {!loading && displayTours.length > 0 && (
+                <p className="text-gray-600 mt-1">
+                  Showing {displayTours.length} tour{displayTours.length !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
           </div>
+          
           <TourSearchBar
             defaultValue={filters.search}
             onSearch={handleSearch}
@@ -292,10 +393,10 @@ const TourListing = () => {
           </motion.div>
         ) : displayTours.length > 0 ? (
           <>
-            {/* ✅ Enhanced Animated Tour Grid with Page Transitions */}
+            {/* Enhanced Animated Tour Grid */}
             <AnimatePresence mode="wait">
               <motion.div
-                key={page} // ✅ Only animate when page changes
+                key={page}
                 variants={pageVariants}
                 initial="initial"
                 animate="in"
@@ -303,7 +404,6 @@ const TourListing = () => {
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               >
                 <AnimatePresence>
-                  {/* Show previous tours during transition to reduce flicker */}
                   {(isTransitioning ? tours : displayTours).map((tour) => (
                     <motion.div
                       key={tour.id}
@@ -311,7 +411,7 @@ const TourListing = () => {
                       initial="hidden"
                       animate="visible"
                       exit="hidden"
-                      layout // ✅ Smooth layout animations
+                      layout
                       transition={{
                         type: "spring",
                         stiffness: 300,
@@ -325,7 +425,7 @@ const TourListing = () => {
               </motion.div>
             </AnimatePresence>
 
-            {/* Pagination with subtle animation */}
+            {/* Pagination */}
             {totalPages > 1 && (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
@@ -343,7 +443,7 @@ const TourListing = () => {
             )}
           </>
         ) : (
-          // Empty State with animation
+          // Empty State
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
