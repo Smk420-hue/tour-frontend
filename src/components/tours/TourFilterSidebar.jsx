@@ -1,5 +1,5 @@
 // src/components/tours/TourFilterSidebar.jsx
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   X,
   Filter,
@@ -11,26 +11,10 @@ import {
   IndianRupee,
 } from "lucide-react";
 
-// --- Custom Hook: Debounce ---
-const useDebounce = (value, delay) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
-
 // --- Constants ---
 const DEFAULT_FILTERS = {
-  priceRange: [0, 500000],
+  minPrice: 0,
+  maxPrice: 500000,
   duration: "",
   rating: "",
   category: "",
@@ -40,7 +24,6 @@ const DEFAULT_FILTERS = {
 };
 
 const PRICE_LIMIT = 500000;
-const DEBOUNCE_DELAY = 500;
 
 // --- Filter Configuration ---
 const FILTER_CONFIG = {
@@ -123,30 +106,11 @@ const RatingPill = ({ stars, active, onClick }) => (
 
 const PriceRangeSlider = ({ 
   value, 
-  onChange, 
-  onCommit,
+  onChange,
   min = 0, 
   max = PRICE_LIMIT,
   formatPrice 
 }) => {
-  const [activeSlider, setActiveSlider] = useState(null);
-  const [showTooltip, setShowTooltip] = useState(false);
-  const tooltipTimeoutRef = useRef(null);
-
-  const handleSliderStart = (sliderType) => {
-    setActiveSlider(sliderType);
-    setShowTooltip(true);
-    clearTimeout(tooltipTimeoutRef.current);
-  };
-
-  const handleSliderEnd = () => {
-    onCommit(value);
-    tooltipTimeoutRef.current = setTimeout(() => {
-      setShowTooltip(false);
-      setActiveSlider(null);
-    }, 800);
-  };
-
   const handleChange = (index, newValue) => {
     const newRange = [...value];
     newRange[index] = parseInt(newValue, 10);
@@ -156,15 +120,7 @@ const PriceRangeSlider = ({
     if (index === 1 && newRange[1] < newRange[0]) newRange[0] = newRange[1];
 
     onChange(newRange);
-    setShowTooltip(true);
-    clearTimeout(tooltipTimeoutRef.current);
   };
-
-  useEffect(() => {
-    return () => {
-      clearTimeout(tooltipTimeoutRef.current);
-    };
-  }, []);
 
   const minPosition = (value[0] / max) * 100;
   const maxPosition = (value[1] / max) * 100;
@@ -178,31 +134,6 @@ const PriceRangeSlider = ({
       </div>
 
       <div className="relative py-4">
-        {/* Tooltips */}
-        {showTooltip && activeSlider === 'min' && (
-          <div
-            className="absolute bottom-full mb-2 transform -translate-x-1/2 z-10 transition-all duration-300"
-            style={{ left: `${minPosition}%` }}
-          >
-            <div className="bg-gray-900 text-white text-sm px-3 py-1 rounded-lg shadow-lg whitespace-nowrap">
-              {formatPrice(value[0])}
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-            </div>
-          </div>
-        )}
-
-        {showTooltip && activeSlider === 'max' && (
-          <div
-            className="absolute bottom-full mb-2 transform -translate-x-1/2 z-10 transition-all duration-300"
-            style={{ left: `${maxPosition}%` }}
-          >
-            <div className="bg-gray-900 text-white text-sm px-3 py-1 rounded-lg shadow-lg whitespace-nowrap">
-              {formatPrice(value[1])}
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-            </div>
-          </div>
-        )}
-
         {/* Track */}
         <div className="absolute w-full h-3 bg-gray-200 rounded-full top-1/2 transform -translate-y-1/2"></div>
 
@@ -222,10 +153,6 @@ const PriceRangeSlider = ({
           max={max}
           step="1000"
           value={value[0]}
-          onMouseDown={() => handleSliderStart('min')}
-          onTouchStart={() => handleSliderStart('min')}
-          onMouseUp={handleSliderEnd}
-          onTouchEnd={handleSliderEnd}
           onChange={(e) => handleChange(0, e.target.value)}
           className="absolute w-full h-3 appearance-none bg-transparent pointer-events-none top-1/2 transform -translate-y-1/2 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-indigo-500 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-transform"
         />
@@ -235,10 +162,6 @@ const PriceRangeSlider = ({
           max={max}
           step="1000"
           value={value[1]}
-          onMouseDown={() => handleSliderStart('max')}
-          onTouchStart={() => handleSliderStart('max')}
-          onMouseUp={handleSliderEnd}
-          onTouchEnd={handleSliderEnd}
           onChange={(e) => handleChange(1, e.target.value)}
           className="absolute w-full h-3 appearance-none bg-transparent pointer-events-none top-1/2 transform -translate-y-1/2 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-purple-500 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-transform"
         />
@@ -258,73 +181,85 @@ const TourFilterSidebar = ({
   onClose,
   onFilterChange,
   initialFilters = {},
-  availableFilters = {},
 }) => {
-  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, ...initialFilters });
-  const [localPriceRange, setLocalPriceRange] = useState(filters.priceRange);
-  const [localState, setLocalState] = useState(filters.state || "");
-  const [localCountry, setLocalCountry] = useState(filters.country || "");
+  // Simple state management - use initialFilters as base
+  const [filters, setFilters] = useState({ 
+    ...DEFAULT_FILTERS, 
+    ...initialFilters 
+  });
 
-  // Debounced text inputs
-  const debouncedState = useDebounce(localState, DEBOUNCE_DELAY);
-  const debouncedCountry = useDebounce(localCountry, DEBOUNCE_DELAY);
+  // Local state for price range (for smooth slider interaction)
+  const [localPriceRange, setLocalPriceRange] = useState([
+    filters.minPrice || 0,
+    filters.maxPrice || PRICE_LIMIT
+  ]);
 
-  // Sync with parent when debounced values change
+  // Update local state when initialFilters change
   useEffect(() => {
-    const newFilters = { 
-      ...filters, 
-      state: debouncedState, 
-      country: debouncedCountry 
-    };
-    setFilters(newFilters);
-    onFilterChange(newFilters);
-  }, [debouncedState, debouncedCountry]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync initial filters from parent
-  useEffect(() => {
-    const newFilters = { ...DEFAULT_FILTERS, ...initialFilters };
-    setFilters(newFilters);
-    setLocalPriceRange(newFilters.priceRange);
-    setLocalState(newFilters.state || "");
-    setLocalCountry(newFilters.country || "");
+    setFilters(prev => ({ ...prev, ...initialFilters }));
+    setLocalPriceRange([
+      initialFilters.minPrice || 0,
+      initialFilters.maxPrice || PRICE_LIMIT
+    ]);
   }, [initialFilters]);
 
-  // Filter change handlers
-  const handleFilterChange = useCallback((key, value) => {
-    const newFilters = { ...filters, [key]: value };
+  // Handle filter updates and call parent
+  const handleFilterUpdate = useCallback((newFilters) => {
+    console.log('🔄 FilterSidebar: Updating filters', newFilters);
     setFilters(newFilters);
     onFilterChange(newFilters);
-  }, [filters, onFilterChange]);
-
-  const handlePriceRangeChange = useCallback((newRange) => {
-    setLocalPriceRange(newRange);
-  }, []);
-
-  const handlePriceRangeCommit = useCallback((newRange) => {
-    const newFilters = { ...filters, priceRange: newRange };
-    setFilters(newFilters);
-    onFilterChange(newFilters);
-  }, [filters, onFilterChange]);
-
-  const handleReset = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
-    setLocalPriceRange(DEFAULT_FILTERS.priceRange);
-    setLocalState("");
-    setLocalCountry("");
-    onFilterChange(DEFAULT_FILTERS);
   }, [onFilterChange]);
 
-  // Utility functions
+  // Handle price range changes (immediate for slider, debounced for API)
+  const handlePriceRangeChange = useCallback((priceRange) => {
+    setLocalPriceRange(priceRange);
+    // Update filters immediately for smooth UI
+    handleFilterUpdate({ 
+      ...filters, 
+      minPrice: priceRange[0], 
+      maxPrice: priceRange[1] 
+    });
+  }, [filters, handleFilterUpdate]);
+
+  // Handle filter toggles (category, duration, rating)
+  const handleFilterToggle = useCallback((key, value) => {
+    const newValue = filters[key] === value ? "" : value;
+    const newFilters = { ...filters, [key]: newValue };
+    
+    // Special handling for category changes
+    if (key === 'category' && newValue !== filters.category) {
+      // Clear location filters when category changes
+      if (newValue === 'domestic') {
+        newFilters.country = '';
+      } else if (newValue === 'international') {
+        newFilters.state = '';
+      }
+    }
+    
+    handleFilterUpdate(newFilters);
+  }, [filters, handleFilterUpdate]);
+
+  // Handle input changes (state, country, sortBy)
+  const handleInputChange = useCallback((key, value) => {
+    handleFilterUpdate({ ...filters, [key]: value });
+  }, [filters, handleFilterUpdate]);
+
+  // Reset all filters
+  const handleReset = useCallback(() => {
+    console.log('🗑️ FilterSidebar: Resetting all filters');
+    const resetFilters = { ...DEFAULT_FILTERS };
+    setFilters(resetFilters);
+    setLocalPriceRange([resetFilters.minPrice, resetFilters.maxPrice]);
+    onFilterChange(resetFilters);
+  }, [onFilterChange]);
+
+  // Format price for display
   const formatPrice = useCallback((price) => 
     new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 0,
     }).format(price), []);
-
-  const toggleFilter = useCallback((key, value) => {
-    handleFilterChange(key, filters[key] === value ? "" : value);
-  }, [filters, handleFilterChange]);
 
   return (
     <>
@@ -370,6 +305,17 @@ const TourFilterSidebar = ({
               </div>
             </div>
 
+            {/* Debug Info - Remove in production */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-xs text-blue-800">
+                <strong>Active Filters:</strong> 
+                {filters.category && ` ${filters.category}`}
+                {filters.duration && ` • ${filters.duration} days`}
+                {filters.rating && ` • ${filters.rating}+ stars`}
+                {filters.minPrice > 0 && ` • From ${formatPrice(filters.minPrice)}`}
+              </div>
+            </div>
+
             <div className="space-y-6">
               {/* Price Range */}
               <FilterSection
@@ -379,7 +325,6 @@ const TourFilterSidebar = ({
                 <PriceRangeSlider
                   value={localPriceRange}
                   onChange={handlePriceRangeChange}
-                  onCommit={handlePriceRangeCommit}
                   formatPrice={formatPrice}
                 />
               </FilterSection>
@@ -394,7 +339,7 @@ const TourFilterSidebar = ({
                     <FilterPill
                       key={category.value}
                       active={filters.category === category.value}
-                      onClick={() => toggleFilter("category", category.value)}
+                      onClick={() => handleFilterToggle("category", category.value)}
                       icon={category.icon}
                     >
                       {category.label}
@@ -403,24 +348,26 @@ const TourFilterSidebar = ({
                 </div>
               </FilterSection>
 
-              {/* State Search */}
-              <FilterSection
-                title="Destination State"
-                icon={<MapPin className="w-4 h-4 text-indigo-600" />}
-              >
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by state..."
-                    value={localState}
-                    onChange={(e) => setLocalState(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all bg-white placeholder-gray-400"
-                  />
-                </div>
-              </FilterSection>
+              {/* State Search - Only show for domestic tours */}
+              {(!filters.category || filters.category === 'domestic') && (
+                <FilterSection
+                  title="Destination State"
+                  icon={<MapPin className="w-4 h-4 text-indigo-600" />}
+                >
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by state..."
+                      value={filters.state || ''}
+                      onChange={(e) => handleInputChange("state", e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all bg-white placeholder-gray-400"
+                    />
+                  </div>
+                </FilterSection>
+              )}
               
-              {/* Country Search */}
+              {/* Country Search - Only show for international tours */}
               {filters.category === "international" && (
                 <FilterSection
                   title="Destination Country"
@@ -431,8 +378,8 @@ const TourFilterSidebar = ({
                     <input
                       type="text"
                       placeholder="Search by country..."
-                      value={localCountry}
-                      onChange={(e) => setLocalCountry(e.target.value)}
+                      value={filters.country || ''}
+                      onChange={(e) => handleInputChange("country", e.target.value)}
                       className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all bg-white placeholder-gray-400"
                     />
                   </div>
@@ -449,7 +396,7 @@ const TourFilterSidebar = ({
                     <FilterPill
                       key={duration.value}
                       active={filters.duration === duration.value}
-                      onClick={() => toggleFilter("duration", duration.value)}
+                      onClick={() => handleFilterToggle("duration", duration.value)}
                       icon={duration.icon}
                     >
                       {duration.label}
@@ -469,7 +416,7 @@ const TourFilterSidebar = ({
                       key={stars}
                       stars={stars}
                       active={filters.rating === stars.toString()}
-                      onClick={() => toggleFilter("rating", stars.toString())}
+                      onClick={() => handleFilterToggle("rating", stars.toString())}
                     />
                   ))}
                 </div>
@@ -478,8 +425,8 @@ const TourFilterSidebar = ({
               {/* Sort By */}
               <FilterSection title="Sort By">
                 <select
-                  value={filters.sortBy}
-                  onChange={(e) => handleFilterChange("sortBy", e.target.value)}
+                  value={filters.sortBy || 'latest'}
+                  onChange={(e) => handleInputChange("sortBy", e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all bg-white"
                 >
                   {FILTER_CONFIG.sortOptions.map((option) => (
