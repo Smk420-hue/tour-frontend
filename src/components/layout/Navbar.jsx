@@ -233,24 +233,15 @@ const Navbar = ({ handleLogout }) => {
 
   // Customer dashboard menu items
   const customerMenuItems = [
-    { to: "/dashboard", label: "Dashboard Overview" },
-    { to: "/dashboard/bookings", label: "My Bookings" },
-    { to: "/dashboard/profile", label: "Profile Settings" },
-    { to: "/dashboard/wishlist", label: "Wishlist" },
-    { to: "/dashboard/payments", label: "Payment History" },
-    { to: "/dashboard/reviews", label: "My Reviews" },
-    { to: "/dashboard/support", label: "Support" }
+    { to: "/profile", label: "Dashboard Overview" },
+    { to: "/my-bookings", label: "My Bookings" },
+    
   ];
 
   // Admin dashboard menu items
   const adminMenuItems = [
-    { to: "/admin/dashboard", label: "Admin Dashboard" },
-    { to: "/admin/users", label: "User Management" },
-    { to: "/admin/tours", label: "Tour Management" },
-    { to: "/admin/bookings", label: "Booking Management" },
-    { to: "/admin/hotels", label: "Hotel Management" },
-    { to: "/admin/settings", label: "System Settings" },
-    { to: "/admin/analytics", label: "Analytics & Reports" }
+    { to: "/admin", label: "Admin Dashboard" },
+   
   ];
 
   // Navigation links
