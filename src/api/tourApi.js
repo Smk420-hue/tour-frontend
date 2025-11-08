@@ -254,3 +254,51 @@ export const getInternationalTours = async (filters = {}) => {
   const { data } = await axiosInstance.get(`/tours/international?${params.toString()}`);
   return data;
 };
+
+// src/api/tourApi.js
+
+// ✅ Enhanced filter with all options
+
+export const getFilteredToursEnhanced = async (filters = {}) => {
+  const params = new URLSearchParams();
+  
+  console.log('🚀 API ENHANCED FILTER: Preparing filters:', filters);
+  
+  // Add all filters directly
+  Object.keys(filters).forEach(key => {
+    const value = filters[key];
+    
+    // Skip empty values and signal object
+    if (value === null || value === undefined || value === '' || key === 'signal') {
+      return;
+    }
+    
+    // Special handling for price range
+    if (key === 'minPrice' && value === 0) return; // Skip default minPrice
+    if (key === 'maxPrice' && value === 500000) return; // Skip default maxPrice
+    
+    params.append(key, value.toString());
+  });
+
+  const queryString = params.toString();
+  console.log('🎯 API ENHANCED FILTER: Calling /tours/filter/enhanced with:', queryString);
+  
+  // ✅ This should call the new endpoint
+  const { data } = await axiosInstance.get(`/tours/filter/enhanced?${queryString}`);
+  return data;
+};
+
+// ✅ Quick filter for common use cases
+export const getQuickFilteredTours = async (filters = {}) => {
+  const params = new URLSearchParams();
+  
+  Object.keys(filters).forEach(key => {
+    const value = filters[key];
+    if (value !== null && value !== undefined && value !== '') {
+      params.append(key, value.toString());
+    }
+  });
+
+  const { data } = await axiosInstance.get(`/tours/filter/quick?${params.toString()}`);
+  return data;
+};
